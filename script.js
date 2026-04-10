@@ -225,8 +225,8 @@ closeBtn.addEventListener('click', closeModal);
 overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-/* Bind all [data-modal] triggers */
-document.querySelectorAll('[data-modal]').forEach(el => {
+/* Bind all [data-modal] triggers — exclude sidebar/bottom-nav (they have own handlers) */
+document.querySelectorAll('[data-modal]:not(.sidebar-nav-item):not(.bottom-nav-item):not(.sidebar-logo)').forEach(el => {
   el.addEventListener('click', e => {
     e.preventDefault();
     openModal(el.dataset.modal, el);
@@ -236,77 +236,185 @@ document.querySelectorAll('[data-modal]').forEach(el => {
 
 
 /* ================================================================
-   HAMBURGER / MOBILE NAV
+   SIDEBAR + BOTTOM NAV NAVIGATION SYSTEM
    ================================================================ */
-const hamburger  = document.getElementById('hamburger');
-const navEl      = document.getElementById('nav');
-const navBackdrop = document.getElementById('navBackdrop');
+const sidebar         = document.getElementById('sidebar');
+const sidebarToggle   = document.getElementById('sidebarToggle');
+const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+const mainContent     = document.getElementById('mainContent');
+const isMobile        = () => window.innerWidth <= 900;
 
-function openNav() {
-  hamburger.classList.add('open');
-  navEl.classList.add('open');
-  if (navBackdrop) {
-    navBackdrop.classList.add('open');
-    navBackdrop.setAttribute('aria-hidden', 'false');
-  }
-  document.body.style.overflow = 'hidden';
+/* ── Desktop sidebar collapse/expand ─────────────────────────── */
+let sidebarCollapsed = false;
+
+function collapseSidebar() {
+  sidebarCollapsed = true;
+  sidebar.classList.add('collapsed');
+  document.body.classList.add('sidebar-collapsed');
+}
+function expandSidebar() {
+  sidebarCollapsed = false;
+  sidebar.classList.remove('collapsed');
+  document.body.classList.remove('sidebar-collapsed');
 }
 
-function closeNav() {
-  hamburger.classList.remove('open');
-  navEl.classList.remove('open');
-  if (navBackdrop) {
-    navBackdrop.classList.remove('open');
-    navBackdrop.setAttribute('aria-hidden', 'true');
-  }
+/* Start collapsed on page load (desktop only) */
+if (!isMobile()) { collapseSidebar(); }
+
+/* ── Mobile sidebar open/close ───────────────────────────────── */
+function openMobileSidebar() {
+  sidebar.classList.add('mobile-open');
+  sidebarBackdrop.classList.add('open');
+  sidebarBackdrop.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+}
+function closeMobileSidebar() {
+  sidebar.classList.remove('mobile-open');
+  sidebarBackdrop.classList.remove('open');
+  sidebarBackdrop.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
 }
 
-hamburger.addEventListener('click', () => {
-  navEl.classList.contains('open') ? closeNav() : openNav();
-});
-
-/* Close nav when clicking the backdrop */
-if (navBackdrop) {
-  navBackdrop.addEventListener('click', closeNav);
-}
-
-/* Close nav when clicking outside on mobile */
-document.addEventListener('click', e => {
-  if (navEl.classList.contains('open') &&
-      !navEl.contains(e.target) &&
-      !hamburger.contains(e.target) &&
-      !(navBackdrop && navBackdrop.contains(e.target))) {
-    closeNav();
+/* ── Toggle button behaviour ─────────────────────────────────── */
+sidebarToggle.addEventListener('click', () => {
+  if (isMobile()) {
+    sidebar.classList.contains('mobile-open') ? closeMobileSidebar() : openMobileSidebar();
+  } else {
+    sidebarCollapsed ? expandSidebar() : collapseSidebar();
   }
 });
 
+/* Close mobile sidebar on backdrop click */
+sidebarBackdrop.addEventListener('click', closeMobileSidebar);
+
+/* Close mobile sidebar on Escape */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && sidebar.classList.contains('mobile-open')) closeMobileSidebar();
+});
+
+/* Reset sidebar state on resize */
+window.addEventListener('resize', () => {
+  if (!isMobile()) {
+    closeMobileSidebar();
+    document.body.style.overflow = '';
+  }
+}, { passive: true });
+
+/* ── Active state helper ─────────────────────────────────────── */
+function setActiveNavItem(modalKey) {
+  document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.modal === modalKey);
+  });
+  document.querySelectorAll('.bottom-nav-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.modal === modalKey);
+  });
+}
+
+/* ── Sidebar ripple helper ───────────────────────────────────── */
+function fireSidebarRipple(btn, e) {
+  const rect   = btn.getBoundingClientRect();
+  const x      = (e.clientX || rect.left + rect.width  / 2) - rect.left;
+  const y      = (e.clientY || rect.top  + rect.height / 2) - rect.top;
+  const size   = Math.max(rect.width, rect.height) * 1.8;
+  const ripple = document.createElement('span');
+  ripple.className = 'sni-ripple';
+  ripple.style.cssText = `
+    width: ${size}px; height: ${size}px;
+    left: ${x - size / 2}px; top: ${y - size / 2}px;
+  `;
+  btn.appendChild(ripple);
+  ripple.addEventListener('animationend', () => ripple.remove());
+
+  /* Icon bounce */
+  btn.classList.add('sni-clicked');
+  btn.addEventListener('animationend', () => btn.classList.remove('sni-clicked'), { once: true });
+}
+
+/* ── Bottom nav press helper ─────────────────────────────────── */
+function fireBottomNavPress(btn) {
+  btn.classList.add('bni-pressed');
+  btn.addEventListener('animationend', () => btn.classList.remove('bni-pressed'), { once: true });
+}
+
+/* ── Bind sidebar nav items ──────────────────────────────────── */
+document.querySelectorAll('.sidebar-nav-item').forEach(btn => {
+  btn.addEventListener('click', e => {
+    const key = btn.dataset.modal;
+    setActiveNavItem(key);
+    fireSidebarRipple(btn, e);
+    openModal(key, btn);
+    if (isMobile()) closeMobileSidebar();
+  });
+});
+
+/* ── Bind bottom nav items ───────────────────────────────────── */
+document.querySelectorAll('.bottom-nav-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.modal;
+    setActiveNavItem(key);
+    fireBottomNavPress(btn);
+    openModal(key, btn);
+  });
+});
+
+/* Bind sidebar logo — scrolls to top with ripple animation */
+const sidebarLogo = document.getElementById('sidebarLogo');
+if (sidebarLogo) {
+  sidebarLogo.addEventListener('click', e => {
+    e.preventDefault();
+    setActiveNavItem('home');
+    /* Trigger logo burst animation */
+    sidebarLogo.classList.remove('logo-clicked');
+    void sidebarLogo.offsetWidth;
+    sidebarLogo.classList.add('logo-clicked');
+    sidebarLogo.addEventListener('animationend', () => {
+      sidebarLogo.classList.remove('logo-clicked');
+    }, { once: true });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (isMobile()) closeMobileSidebar();
+  });
+}
+
+/* Bind mobile topbar hamburger button */
+/* Mobile topbar logo — tap scrolls to top / home */
+const mobileTopbarLogo = document.getElementById('mobileTopbarLogo');
+if (mobileTopbarLogo) {
+  mobileTopbarLogo.addEventListener('click', (e) => {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setActiveNavItem('home');
+  });
+}
+
+/* Bottom nav light button — toggles flashlight */
+const bottomNavLightBtn = document.getElementById('bottomNavLightBtn');
+if (bottomNavLightBtn) {
+  bottomNavLightBtn.addEventListener('click', () => {
+    const flashlightToggle = document.getElementById('flashlightToggleBtn');
+    if (flashlightToggle) {
+      flashlightToggle.click();
+    }
+    bottomNavLightBtn.classList.toggle('fl-active');
+  });
+}
+
+/* Legacy closeNav function (still referenced by openModal) */
+function closeNav() {
+  if (isMobile()) closeMobileSidebar();
+}
+
 
 /* ================================================================
-   STICKY HEADER — rAF-throttled scroll listener
-   Hides hamburger when footer comes into view on mobile.
+   SCROLL — sidebar scrolled state (subtle gold glow)
    ================================================================ */
-const header  = document.getElementById('header');
 const footer  = document.getElementById('footer');
 let   ticking = false;
 
 function updateOnScroll() {
-  header.classList.toggle('scrolled', window.scrollY > 50);
-
-  /* Hamburger hide/show based on footer visibility — mobile only */
-  if (window.innerWidth <= 768 && footer) {
-    const footerTop = footer.getBoundingClientRect().top;
-    const viewH     = window.innerHeight;
-    /* Footer has entered the viewport */
-    if (footerTop < viewH) {
-      hamburger.classList.add('hamburger--hidden');
-      /* Also close nav if it was open */
-      if (navEl.classList.contains('open')) closeNav();
-    } else {
-      hamburger.classList.remove('hamburger--hidden');
-    }
+  /* Add subtle scrolled class to sidebar for potential style variations */
+  if (sidebar) {
+    sidebar.classList.toggle('scrolled', window.scrollY > 50);
   }
-
   ticking = false;
 }
 
@@ -314,13 +422,6 @@ window.addEventListener('scroll', () => {
   if (!ticking) {
     requestAnimationFrame(updateOnScroll);
     ticking = true;
-  }
-}, { passive: true });
-
-/* Re-evaluate on resize (e.g. orientation change) */
-window.addEventListener('resize', () => {
-  if (window.innerWidth > 768) {
-    hamburger.classList.remove('hamburger--hidden');
   }
 }, { passive: true });
 
@@ -892,21 +993,27 @@ modalContent['itdigital'] = {
       /* Retrigger all CSS entrance animations by forcing a reflow */
       void modalBox.offsetWidth;
 
-      /* Restart the typing line animation */
+      /* Restart the typing line with clean fade animation (no width clipping) */
       setTimeout(function() {
         const typingLine = document.getElementById('itTypingLine');
         if (typingLine) {
+          /* Reset animation cleanly */
           typingLine.style.animation = 'none';
-          void typingLine.offsetWidth; /* reflow */
+          typingLine.style.opacity = '0';
+          typingLine.style.transform = 'translateY(8px)';
+          /* Force reflow so browser sees the reset state */
+          void typingLine.offsetHeight;
+          /* Re-apply the animation */
           typingLine.style.animation = '';
+          typingLine.style.opacity = '';
+          typingLine.style.transform = '';
         }
 
-        /* Pulse-highlight each skill dot sequentially */
-        var dots = modalBox.querySelectorAll('.it-skill-list li::before');
+        /* Pulse-highlight each skill item sequentially */
         var items = modalBox.querySelectorAll('.it-skill-list li');
         items.forEach(function(li, i) {
           setTimeout(function() {
-            li.style.transition = 'color 0.22s ease';
+            li.style.transition = 'color 0.22s ease, transform 0.22s ease';
           }, i * 80);
         });
       }, 80);
@@ -1076,7 +1183,8 @@ modalContent['itdigital'] = {
 })();
 
 /* ================================================================
-   FEATURE BOXES — 3D Tilt, Entrance Reveal & Modal Integration
+   FEATURE BOXES — Smooth 3D Tilt, Entrance Reveal & Modal Integration
+   Redesigned v2: tilt targets .tilt-card-inner for clean 3D transform
    ================================================================ */
 (function initFeatureBoxes() {
   'use strict';
@@ -1094,94 +1202,147 @@ modalContent['itdigital'] = {
           revealObserver.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    }, { threshold: 0.10, rootMargin: '0px 0px -30px 0px' });
     boxes.forEach(function(box) { revealObserver.observe(box); });
   } else {
     boxes.forEach(function(box) { box.classList.add('fb-visible'); });
   }
 
-  /* ── 3D Tilt interaction ──────────────────────────────────── */
-  var MAX_TILT   = 10;    /* max rotation degrees */
-  var MAX_SCALE  = 1.028; /* subtle scale on hover */
-  var EASE_BACK  = '0.55s cubic-bezier(0.22,1,0.36,1)';
-
-  function onMouseMove(e) {
-    var box  = this;
-    var rect = box.getBoundingClientRect();
-    var x    = e.clientX - rect.left;
-    var y    = e.clientY - rect.top;
-    var cx   = rect.width  / 2;
-    var cy   = rect.height / 2;
-
-    /* Normalise to -1 … +1 */
-    var nx = (x - cx) / cx;
-    var ny = (y - cy) / cy;
-
-    var rotY =  nx * MAX_TILT;
-    var rotX = -ny * MAX_TILT;
-
-    /* Apply tilt — override entrance transition with fast one */
-    box.style.transition = 'transform 0.12s cubic-bezier(0.22,1,0.36,1), box-shadow 0.14s ease, border-color 0.22s ease';
-    box.style.transform  =
-      'perspective(800px)' +
-      ' rotateX(' + rotX.toFixed(2) + 'deg)' +
-      ' rotateY(' + rotY.toFixed(2) + 'deg)' +
-      ' scale(' + MAX_SCALE + ')';
-
-    /* Move glow radial to cursor position */
-    var glow = box.querySelector('.feature-box-glow');
-    if (glow) {
-      var px = ((x / rect.width)  * 100).toFixed(1) + '%';
-      var py = ((y / rect.height) * 100).toFixed(1) + '%';
-      glow.style.background =
-        'radial-gradient(circle at ' + px + ' ' + py + ', rgba(212,175,55,0.16) 0%, transparent 68%)';
-    }
-  }
-
-  function onMouseLeave() {
-    var box = this;
-    box.style.transition = EASE_BACK + ', box-shadow 0.28s ease, border-color 0.22s ease';
-    box.style.transform  = 'perspective(800px) rotateX(0deg) rotateY(0deg) scale(1)';
-
-    var glow = box.querySelector('.feature-box-glow');
-    if (glow) {
-      glow.style.background = 'radial-gradient(circle at 50% 50%, rgba(212,175,55,0.13) 0%, transparent 70%)';
-    }
-  }
-
-  /* ── Click → open existing modal system ──────────────────── */
-  function onBoxClick(e) {
-    var box = this;
-    var key = box.getAttribute('data-modal');
-    if (!key) return;
-
-    /* Use the IT-aware patched openModal if available, else fallback */
-    if (typeof window._openModalIT === 'function') {
-      window._openModalIT(key, box);
-    } else if (typeof openModal === 'function') {
-      openModal(key, box);
-    }
-  }
-
-  /* ── Keyboard accessibility (Enter / Space activates) ─────── */
-  function onBoxKeydown(e) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onBoxClick.call(this, e);
-    }
-  }
+  /* ── Smooth 3D Tilt — rAF-based for 60fps silkiness ──────── */
+  var MAX_TILT  = 11;     /* max rotation degrees */
+  var MAX_SCALE = 1.032;  /* scale on hover */
+  var isTouch   = window.matchMedia('(hover: none)').matches;
 
   boxes.forEach(function(box) {
-    /* Skip touch devices for tilt (they use tap) */
-    var hasTouch = window.matchMedia('(hover: none)').matches;
+    /* Target the inner element that actually tilts */
+    var inner   = box.querySelector('.tilt-card-inner');
+    var ambient = box.querySelector('.fc-ambient');
+    if (!inner) return;
 
-    if (!hasTouch) {
-      box.addEventListener('mousemove',  onMouseMove.bind(box),  { passive: true });
-      box.addEventListener('mouseleave', onMouseLeave.bind(box), { passive: true });
+    /* Per-card animation state */
+    var targetRotX = 0, targetRotY = 0, targetScale = 1;
+    var currentRotX = 0, currentRotY = 0, currentScale = 1;
+    var rafId = null;
+    var isHovered = false;
+    var LERP_IN  = 0.12;  /* follow speed while moving */
+    var LERP_OUT = 0.065; /* spring-back speed */
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    function animate() {
+      var lerpFactor = isHovered ? LERP_IN : LERP_OUT;
+      currentRotX = lerp(currentRotX, targetRotX, lerpFactor);
+      currentRotY = lerp(currentRotY, targetRotY, lerpFactor);
+      currentScale = lerp(currentScale, targetScale, lerpFactor);
+
+      inner.style.transform =
+        'rotateX(' + currentRotX.toFixed(3) + 'deg)' +
+        ' rotateY(' + currentRotY.toFixed(3) + 'deg)' +
+        ' scale(' + currentScale.toFixed(4) + ')';
+
+      /* Dynamically position ambient glow with cursor */
+      if (ambient && isHovered) {
+        /* ambient position is set in onMouseMove, just keep opacity up */
+      }
+
+      /* Check if we're still moving (threshold to stop loop) */
+      var doneX = Math.abs(currentRotX - targetRotX) < 0.005;
+      var doneY = Math.abs(currentRotY - targetRotY) < 0.005;
+      var doneS = Math.abs(currentScale - targetScale) < 0.0001;
+
+      if (!doneX || !doneY || !doneS) {
+        rafId = requestAnimationFrame(animate);
+      } else {
+        /* Snap to target and stop */
+        currentRotX = targetRotX;
+        currentRotY = targetRotY;
+        currentScale = targetScale;
+        inner.style.transform =
+          'rotateX(' + currentRotX.toFixed(3) + 'deg)' +
+          ' rotateY(' + currentRotY.toFixed(3) + 'deg)' +
+          ' scale(' + currentScale.toFixed(4) + ')';
+        rafId = null;
+      }
     }
 
-    box.addEventListener('click',   onBoxClick.bind(box));
-    box.addEventListener('keydown', onBoxKeydown.bind(box));
+    function startLoop() {
+      if (!rafId) rafId = requestAnimationFrame(animate);
+    }
+
+    function onMouseMove(e) {
+      if (!box.classList.contains('fb-visible')) return;
+
+      var rect = box.getBoundingClientRect();
+      var x    = e.clientX - rect.left;
+      var y    = e.clientY - rect.top;
+      var cx   = rect.width  / 2;
+      var cy   = rect.height / 2;
+
+      /* Clamp to card bounds */
+      var nx = Math.max(-1, Math.min(1, (x - cx) / cx));
+      var ny = Math.max(-1, Math.min(1, (y - cy) / cy));
+
+      targetRotY = nx * MAX_TILT;
+      targetRotX = -ny * MAX_TILT;
+      targetScale = MAX_SCALE;
+
+      /* Move ambient glow to cursor */
+      if (ambient) {
+        var px = ((x / rect.width)  * 100).toFixed(1) + '%';
+        var py = ((y / rect.height) * 100).toFixed(1) + '%';
+        ambient.style.background =
+          'radial-gradient(circle at ' + px + ' ' + py +
+          ', rgba(212,175,55,0.13) 0%, transparent 62%)';
+      }
+
+      /* Update shine direction based on cursor quadrant */
+      if (inner) {
+        inner.style.setProperty('--shine-angle',
+          (130 + nx * 20 - ny * 20).toFixed(1) + 'deg');
+      }
+
+      startLoop();
+    }
+
+    function onMouseEnter() {
+      isHovered = true;
+      targetScale = MAX_SCALE;
+      /* Override CSS transition — JS animation handles it */
+      inner.style.transition = 'none';
+      startLoop();
+    }
+
+    function onMouseLeave() {
+      isHovered = false;
+      targetRotX = 0;
+      targetRotY = 0;
+      targetScale = 1;
+      startLoop();
+    }
+
+    if (!isTouch) {
+      box.addEventListener('mouseenter', onMouseEnter, { passive: true });
+      box.addEventListener('mousemove',  onMouseMove,  { passive: true });
+      box.addEventListener('mouseleave', onMouseLeave, { passive: true });
+    }
+
+    /* ── Click → open modal ──────────────────────────────── */
+    box.addEventListener('click', function() {
+      var key = box.getAttribute('data-modal');
+      if (!key) return;
+      if (typeof window._openModalIT === 'function') {
+        window._openModalIT(key, box);
+      } else if (typeof openModal === 'function') {
+        openModal(key, box);
+      }
+    });
+
+    box.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        box.click();
+      }
+    });
   });
 
 })();
@@ -1236,10 +1397,18 @@ modalContent['itdigital'] = {
     wrap.style.top        = (vy - wrap.offsetHeight / 2) + 'px';
   }
 
-  /* ── Update spotlight overlay ─────────────────────────────── */
+  /* ── Update spotlight overlay — light originates from beam tip ─ */
   function updateGlow(vx, vy) {
-    var pxPct = ((vx / window.innerWidth)  * 100).toFixed(2) + '%';
-    var pyPct = ((vy / window.innerHeight) * 100).toFixed(2) + '%';
+    /* The SVG beam points LEFT. The beam tip is at the LEFT edge of wrap.
+       Adjust the spotlight center to the beam tip, not the wrap center. */
+    var r         = wrap.getBoundingClientRect();
+    /* Beam tip = left edge of the wrap (the cone points fully left) */
+    var beamTipX  = r.left;          /* x at left edge */
+    var beamTipY  = r.top + r.height * 0.42; /* y at ~middle of barn doors */
+
+    var pxPct = ((beamTipX / window.innerWidth)  * 100).toFixed(2) + '%';
+    var pyPct = ((beamTipY / window.innerHeight) * 100).toFixed(2) + '%';
+
     glow.style.background =
       'radial-gradient(' +
         'circle ' + RADIUS + 'px at ' + pxPct + ' ' + pyPct + ',' +
@@ -1249,13 +1418,19 @@ modalContent['itdigital'] = {
         'rgba(0,0,0,0.32) 78%,' +
         'rgba(0,0,0,0.48) 100%' +
       ')';
-    /* Position halo at LED panel (slightly left/up of centre since beam goes left) */
-    halo.style.left = (vx - 16) + 'px';
-    halo.style.top  = vy + 'px';
+
+    /* Position halo at beam tip */
+    halo.style.left = beamTipX + 'px';
+    halo.style.top  = beamTipY + 'px';
   }
 
   /* ── Light ON ──────────────────────────────────────────────── */
-  function lightOn(vx, vy) {
+  function lightOn() {
+    /* Always recalculate beam tip from current wrap position */
+    var r        = wrap.getBoundingClientRect();
+    var beamTipX = r.left;
+    var beamTipY = r.top + r.height * 0.42;
+
     if (!isLit) {
       isLit = true;
       glow.classList.add('on');
@@ -1266,7 +1441,7 @@ modalContent['itdigital'] = {
         hint.classList.add('hidden');
       }
     }
-    updateGlow(vx, vy);
+    updateGlow(beamTipX, beamTipY);
   }
 
   /* ── Light OFF + return to origin ──────────────────────────── */
@@ -1324,7 +1499,7 @@ modalContent['itdigital'] = {
 
     var cx = r.left + r.width  / 2;
     var cy = r.top  + r.height / 2;
-    lightOn(cx, cy);
+    lightOn();
 
     document.addEventListener('mousemove', onMouseMove, { passive: true });
     document.addEventListener('mouseup',   onMouseUp,   { passive: true });
@@ -1346,7 +1521,7 @@ modalContent['itdigital'] = {
     wrap.style.top        = newTop  + 'px';
     var cx = newLeft + wrap.offsetWidth  / 2;
     var cy = newTop  + wrap.offsetHeight / 2;
-    lightOn(cx, cy);
+    lightOn();
   }
 
   function onMouseUp() {
@@ -1372,7 +1547,7 @@ modalContent['itdigital'] = {
 
     var cx = r.left + r.width  / 2;
     var cy = r.top  + r.height / 2;
-    lightOn(cx, cy);
+    lightOn();
   }, { passive: false });
 
   wrap.addEventListener('touchmove', function(e) {
@@ -1392,7 +1567,7 @@ modalContent['itdigital'] = {
     wrap.style.top        = newTop  + 'px';
     var cx = newLeft + wrap.offsetWidth  / 2;
     var cy = newTop  + wrap.offsetHeight / 2;
-    lightOn(cx, cy);
+    lightOn();
   }, { passive: false });
 
   function touchRelease() {
@@ -1479,24 +1654,32 @@ modalContent['itdigital'] = {
   if (!heroPortrait || !hero) return;
 
   var ticking = false;
+  var parallaxActive = true;
 
   function applyParallax() {
     var scrollY  = window.scrollY;
     var heroH    = hero.offsetHeight;
-    /* Only apply while hero is in view */
+
+    /* When hero is fully scrolled past — reset transforms and stop */
     if (scrollY > heroH) {
+      if (parallaxActive) {
+        parallaxActive = false;
+        heroPortrait.style.transform = '';
+        if (heroText) heroText.style.transform = '';
+      }
       ticking = false;
       return;
     }
-    var progress = scrollY / heroH; /* 0 → 1 as hero scrolls out */
 
-    /* Portrait drifts up slightly slower than scroll */
+    parallaxActive = true;
+
+    /* Portrait drifts up slightly slower than scroll — gentle value to prevent disappearing */
     if (heroPortrait) {
-      heroPortrait.style.transform = 'translateY(' + (scrollY * 0.12).toFixed(1) + 'px)';
+      heroPortrait.style.transform = 'translateY(' + (scrollY * 0.08).toFixed(1) + 'px)';
     }
     /* Text drifts up slightly faster */
     if (heroText) {
-      heroText.style.transform = 'translateY(' + (scrollY * 0.06).toFixed(1) + 'px)';
+      heroText.style.transform = 'translateY(' + (scrollY * 0.04).toFixed(1) + 'px)';
     }
 
     ticking = false;
@@ -1541,6 +1724,8 @@ modalContent['itdigital'] = {
     if (halo) { halo.classList.add('fl-hidden'); halo.classList.remove('on'); }
     wrap.classList.remove('lit');
     if (toggleBtn) toggleBtn.classList.remove('fl-active');
+    var bnLight = document.getElementById('bottomNavLightBtn');
+    if (bnLight) bnLight.classList.remove('fl-active');
   }
 
   function showFlashlight() {
@@ -1549,6 +1734,8 @@ modalContent['itdigital'] = {
     if (glow) glow.classList.remove('fl-hidden');
     if (halo) halo.classList.remove('fl-hidden');
     if (toggleBtn) toggleBtn.classList.add('fl-active');
+    var bnLight = document.getElementById('bottomNavLightBtn');
+    if (bnLight) bnLight.classList.add('fl-active');
   }
 
   /* Close (X) button on the flashlight widget */
@@ -1619,18 +1806,20 @@ modalContent['itdigital'] = {
 (function initFeatureBoxTouchTilt() {
   'use strict';
 
-  /* Only run on touch devices */
   var hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
   if (!hasTouch) return;
 
   var boxes = document.querySelectorAll('.feature-box');
   if (!boxes.length) return;
 
-  var MAX_TILT  = 7;    /* reduced tilt for touch */
-  var MAX_SCALE = 1.02;
+  var MAX_TILT  = 8;
+  var MAX_SCALE = 1.022;
   var activeTouches = new Map();
 
   boxes.forEach(function(box) {
+    var inner = box.querySelector('.tilt-card-inner');
+    if (!inner) return;
+
     box.addEventListener('touchstart', function(e) {
       var touch = e.touches[0];
       var rect  = box.getBoundingClientRect();
@@ -1640,17 +1829,14 @@ modalContent['itdigital'] = {
       var y  = touch.clientY - rect.top;
       var cx = rect.width  / 2;
       var cy = rect.height / 2;
-      var nx = (x - cx) / cx;
-      var ny = (y - cy) / cy;
-      var rotY =  nx * MAX_TILT;
-      var rotX = -ny * MAX_TILT;
+      var nx = Math.max(-1, Math.min(1, (x - cx) / cx));
+      var ny = Math.max(-1, Math.min(1, (y - cy) / cy));
 
-      box.style.transition = 'transform 0.15s cubic-bezier(0.22,1,0.36,1), box-shadow 0.15s ease';
-      box.style.transform  =
-        'perspective(600px) rotateX(' + rotX.toFixed(2) + 'deg) rotateY(' + rotY.toFixed(2) + 'deg) scale(' + MAX_SCALE + ')';
-      box.style.boxShadow  =
-        '0 14px 40px rgba(0,0,0,0.48), 0 0 0 1px rgba(212,175,55,0.18)';
-      box.style.borderColor = 'rgba(212,175,55,0.30)';
+      inner.style.transition = 'transform 0.16s cubic-bezier(0.22,1,0.36,1)';
+      inner.style.transform  =
+        'rotateX(' + (-ny * MAX_TILT).toFixed(2) + 'deg)' +
+        ' rotateY(' + (nx * MAX_TILT).toFixed(2) + 'deg)' +
+        ' scale(' + MAX_SCALE + ')';
     }, { passive: true });
 
     box.addEventListener('touchmove', function(e) {
@@ -1665,24 +1851,216 @@ modalContent['itdigital'] = {
       var cy = rect.height / 2;
       var nx = Math.max(-1, Math.min(1, (x - cx) / cx));
       var ny = Math.max(-1, Math.min(1, (y - cy) / cy));
-      var rotY =  nx * MAX_TILT;
-      var rotX = -ny * MAX_TILT;
 
-      box.style.transition = 'transform 0.08s ease, box-shadow 0.08s ease';
-      box.style.transform  =
-        'perspective(600px) rotateX(' + rotX.toFixed(2) + 'deg) rotateY(' + rotY.toFixed(2) + 'deg) scale(' + MAX_SCALE + ')';
+      inner.style.transition = 'transform 0.08s linear';
+      inner.style.transform  =
+        'rotateX(' + (-ny * MAX_TILT).toFixed(2) + 'deg)' +
+        ' rotateY(' + (nx * MAX_TILT).toFixed(2) + 'deg)' +
+        ' scale(' + MAX_SCALE + ')';
     }, { passive: true });
 
     function touchRelease() {
       activeTouches.delete(box);
-      box.style.transition = '0.55s cubic-bezier(0.22,1,0.36,1)';
-      box.style.transform  = 'perspective(600px) rotateX(0deg) rotateY(0deg) scale(1)';
-      box.style.boxShadow  = '';
-      box.style.borderColor = '';
+      inner.style.transition = '0.60s cubic-bezier(0.22,1,0.36,1)';
+      inner.style.transform  = 'rotateX(0deg) rotateY(0deg) scale(1)';
     }
 
     box.addEventListener('touchend',    touchRelease, { passive: true });
     box.addEventListener('touchcancel', touchRelease, { passive: true });
   });
+})();
+
+
+
+/* ================================================================
+   v4.0 ADDITIONS
+   1. Cinematic Loading Screen
+   2. Delay all site animations until loader finishes
+   3. Performance: passive listeners already in place
+   ================================================================ */
+
+/* ── LOADING SCREEN ──────────────────────────────────────────── */
+(function initLoader() {
+  'use strict';
+
+  var loader    = document.getElementById('siteLoader');
+  var barFill   = document.getElementById('loaderBarFill');
+  var center    = loader ? loader.querySelector('.loader-center') : null;
+  if (!loader) return;
+
+  /* Freeze body scroll immediately */
+  document.body.classList.add('loading');
+
+  /* Minimum display time so it never flashes too fast */
+  var MIN_DURATION = 1800; /* ms */
+  var startTime    = Date.now();
+  var pageReady    = false;
+  var minTimeDone  = false;
+
+  /* Progress bar animation — simulate loading progress */
+  var progress = 0;
+  var barTimer = null;
+
+  function advanceBar(target, speed) {
+    clearInterval(barTimer);
+    barTimer = setInterval(function() {
+      if (progress >= target) { clearInterval(barTimer); return; }
+      progress = Math.min(progress + (Math.random() * 4 + 1), target);
+      if (barFill) barFill.style.width = progress.toFixed(1) + '%';
+    }, speed);
+  }
+
+  /* Phase 1: rush to 70% quickly */
+  advanceBar(70, 40);
+
+  /* Phase 2: slow creep to 90% while waiting */
+  setTimeout(function() { advanceBar(90, 120); }, 600);
+
+  /* Slide in the center content shortly after page paint */
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      if (loader) loader.classList.add('loader-show');
+    });
+  });
+
+  /* ── Exit sequence ───────────────────────────────────────── */
+  function runExit() {
+    /* Complete bar to 100% */
+    clearInterval(barTimer);
+    progress = 100;
+    if (barFill) barFill.style.width = '100%';
+
+    /* Small pause so 100% is visible */
+    setTimeout(function() {
+      /* Phase 1: curtain sweeps up over loader content */
+      loader.classList.add('loader-exit');
+
+      setTimeout(function() {
+        /* Phase 2: entire loader slides up off screen */
+        loader.classList.add('loader-gone');
+
+        /* Unlock body scroll + start site animations */
+        document.body.classList.remove('loading');
+        document.body.classList.add('site-ready');
+        document.dispatchEvent(new CustomEvent('siteLoaderDone'));
+
+        setTimeout(function() {
+          loader.classList.add('loader-done');
+        }, 750);
+      }, 760);
+    }, 200);
+  }
+
+  /* ── Trigger exit when BOTH page is ready AND min time passed ── */
+  function tryExit() {
+    if (pageReady && minTimeDone) {
+      runExit();
+    }
+  }
+
+  /* Min duration timer */
+  setTimeout(function() {
+    minTimeDone = true;
+    tryExit();
+  }, MIN_DURATION);
+
+  /* Page ready via window.load */
+  if (document.readyState === 'complete') {
+    pageReady = true;
+    tryExit();
+  } else {
+    window.addEventListener('load', function() {
+      pageReady = true;
+      tryExit();
+    }, { once: true });
+  }
+})();
+
+
+/* ── DELAY SITE ANIMATIONS UNTIL LOADER DONE ────────────────── */
+(function delayAnimationsUntilLoaderDone() {
+  'use strict';
+
+  /* Add class to <html> IMMEDIATELY — CSS uses this to freeze all animations */
+  document.documentElement.classList.add('loader-active');
+
+  document.addEventListener('siteLoaderDone', function() {
+    /* loader-gone animation takes ~680ms (CSS transition).
+       We remove loader-active AFTER that slide finishes so users
+       see the hero fadeUp animation play fully. */
+    setTimeout(function() {
+      /* Step 1: Remove freeze — allows hero-content + hero-title zoom to start */
+      document.documentElement.classList.remove('loader-active');
+
+      /* Step 2: Force-restart the hero-title zoom so it always plays fresh */
+      var heroTitle = document.querySelector('.hero-title');
+      if (heroTitle) {
+        heroTitle.style.animation = 'none';
+        heroTitle.style.opacity   = '0';
+        void heroTitle.offsetWidth; /* trigger reflow */
+        heroTitle.style.animation = '';
+        heroTitle.style.opacity   = '';
+      }
+
+      /* Step 2b & 2c: Logo entrance — desktop sidebar + mobile topbar */
+      var sidebarLogoSvg  = document.querySelector('.sidebar-logo-svg');
+      var sidebarLogoText = document.querySelector('.sidebar-logo-text');
+      var mobileTopbar    = document.getElementById('mobileTopbar');
+      var mobileLogoSvg   = document.querySelector('.mobile-topbar-logo-svg');
+      var mobileLogoBrand = document.querySelector('.mobile-topbar-brand');
+
+      if (sidebarLogoSvg)  sidebarLogoSvg.classList.add('logo-entered');
+      if (sidebarLogoText) sidebarLogoText.classList.add('logo-entered');
+      if (mobileTopbar)    mobileTopbar.classList.add('topbar-entered');
+      if (mobileLogoSvg)   mobileLogoSvg.classList.add('logo-entered');
+      if (mobileLogoBrand) mobileLogoBrand.classList.add('logo-entered');
+
+      /* After each entrance animation ends, hand off to CSS transitions cleanly */
+      function cleanupLogoAnim(el) {
+        if (!el) return;
+        el.addEventListener('animationend', function() {
+          el.style.opacity   = '1';
+          el.style.transform = '';
+          el.style.filter    = '';
+          el.classList.remove('logo-entered');
+        }, { once: true });
+      }
+      cleanupLogoAnim(sidebarLogoSvg);
+      cleanupLogoAnim(sidebarLogoText);
+      cleanupLogoAnim(mobileLogoSvg);
+      cleanupLogoAnim(mobileLogoBrand);
+
+      if (mobileTopbar) {
+        mobileTopbar.addEventListener('animationend', function() {
+          mobileTopbar.style.opacity   = '1';
+          mobileTopbar.style.transform = 'translateY(0)';
+          mobileTopbar.classList.remove('topbar-entered');
+        }, { once: true });
+      }
+
+      /* Step 3: Trigger scroll-reveal checks for elements in viewport */
+      setTimeout(function() {
+        /* Fire a scroll event so IntersectionObservers re-evaluate */
+        window.dispatchEvent(new Event('scroll'));
+
+        /* Directly reveal feature boxes that are in view */
+        var boxes = document.querySelectorAll('.feature-box:not(.fb-visible)');
+        boxes.forEach(function(box) {
+          var rect = box.getBoundingClientRect();
+          if (rect.top < window.innerHeight) {
+            box.classList.add('fb-visible');
+          }
+        });
+
+        /* Trigger section reveals for items in viewport */
+        document.querySelectorAll('.section-reveal:not(.is-visible)').forEach(function(el) {
+          var rect = el.getBoundingClientRect();
+          if (rect.top < window.innerHeight) {
+            el.classList.add('is-visible');
+          }
+        });
+      }, 120);
+    }, 720); /* Wait for loader-gone transition to finish */
+  }, { once: true });
 })();
 
