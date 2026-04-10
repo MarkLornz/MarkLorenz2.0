@@ -394,7 +394,7 @@ if (bottomNavLightBtn) {
     if (flashlightToggle) {
       flashlightToggle.click();
     }
-    bottomNavLightBtn.classList.toggle('fl-active');
+    /* fl-active is managed by showFlashlight() / hideFlashlight() */
   });
 }
 
