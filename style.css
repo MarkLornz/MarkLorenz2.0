@@ -1165,6 +1165,9 @@ html:not(.loader-active) .hero-title .gold {
   .hero {
     min-height: 100svh;
     height: auto;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
   }
 
   .hero-content {
@@ -1193,6 +1196,15 @@ html:not(.loader-active) .hero-title .gold {
   .hero-intro { font-size: 0.86rem; }
   .hero-cta-row { justify-content: center; }
   .camera-wrap { margin: 1.5rem auto 0; }
+
+  /* Move scroll hint below camera on mobile instead of overlapping it */
+  .scroll-hint {
+    position: static;
+    transform: none;
+    margin: 0 auto 2rem;
+    width: fit-content;
+    opacity: 0.35;
+  }
 
   .modal-body { padding: 0.5rem 1.4rem 2rem; }
 }
