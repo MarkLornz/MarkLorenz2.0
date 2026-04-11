@@ -4062,6 +4062,14 @@ button, a {
   box-shadow: 0 0 12px rgba(212,175,55,0.35), 0 2px 10px rgba(0,0,0,0.5) !important;
 }
 
+/* ── MOBILE: always show X button (no hover on touch screens) ── */
+@media (hover: none), (pointer: coarse) {
+  #flashlight-close {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* ── 2. FLASHLIGHT NAV TOGGLE BUTTON ────────────────────────── */
 .flashlight-nav-btn {
   display: flex;
