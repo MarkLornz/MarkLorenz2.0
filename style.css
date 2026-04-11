@@ -1165,9 +1165,6 @@ html:not(.loader-active) .hero-title .gold {
   .hero {
     min-height: 100svh;
     height: auto;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: stretch;
   }
 
   .hero-content {
@@ -1196,15 +1193,6 @@ html:not(.loader-active) .hero-title .gold {
   .hero-intro { font-size: 0.86rem; }
   .hero-cta-row { justify-content: center; }
   .camera-wrap { margin: 1.5rem auto 0; }
-
-  /* Move scroll hint below camera on mobile instead of overlapping it */
-  .scroll-hint {
-    position: static;
-    transform: none;
-    margin: 0 auto 2rem;
-    width: fit-content;
-    opacity: 0.35;
-  }
 
   .modal-body { padding: 0.5rem 1.4rem 2rem; }
 }
@@ -1510,10 +1498,29 @@ html:not(.loader-active) .hero-title .gold {
     filter    var(--t-med) var(--ease-out);
   will-change: transform;
 }
+.poster-img-wrap::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    160deg,
+    rgba(212,175,55,0.18) 0%,
+    rgba(10,31,68,0.30)   60%,
+    rgba(0,0,0,0.50)      100%
+  );
+  opacity: 0;
+  transition: opacity 0.36s var(--ease-out);
+  pointer-events: none;
+}
+.poster-card:hover .poster-img-wrap::before {
+  opacity: 1;
+}
 .poster-card:hover .poster-img {
   transform: scale(1.06) translateY(-6px);
-  filter: brightness(0.70)
-          drop-shadow(0 20px 36px rgba(0,0,0,0.72));
+  filter: saturate(1.18) contrast(1.06)
+          drop-shadow(0 20px 36px rgba(0,0,0,0.55));
 }
 
 .poster-hover-label {
@@ -2029,14 +2036,15 @@ body::after {
 }
 .poster-card:hover .poster-img {
   transform: scale(1.06) translateY(-5px);
-  filter:
-    brightness(0.72)
-    drop-shadow(0 22px 38px rgba(0,0,0,0.75));
+  filter: saturate(1.18) contrast(1.06)
+    drop-shadow(0 22px 38px rgba(0,0,0,0.55));
 }
 .poster-card:hover .poster-img-wrap {
-  box-shadow: 0 18px 48px rgba(0,0,0,0.65);
+  box-shadow:
+    0 18px 48px rgba(0,0,0,0.55),
+    0 0 0 1.5px rgba(212,175,55,0.28);
 }
-/* No border / glow on poster hover */
+/* No extra border overlay */
 .poster-img-wrap::after { display: none; }
 
 
